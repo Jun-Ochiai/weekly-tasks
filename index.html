@@ -203,7 +203,7 @@ function renderStats(){
 
 function newWeek(){
   if(!confirm('新しい週を開始します。完了・削除タスクを除いて引き継ぎます。よろしいですか？'))return;
-  const carry=s=>data[s].filter(t=>t.status!=='done'&&t.status!=='deleted').map(t=>({...t,status:t.status==='active'?'active':''}));
+  const carry=s=>data[s].filter(t=>t.status!=='done'&&t.status!=='deleted').map(t=>({...t,note:'',status:t.status==='active'?'active':'forward'}));
   const n=new Date();
   data={week:`${n.getFullYear()}年${n.getMonth()+1}月${n.getDate()}日`,focused:carry('focused'),unfocused:carry('unfocused')};
   save();render();
