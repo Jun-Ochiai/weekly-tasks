@@ -44,6 +44,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .tnote::placeholder{color:#ddd}
 .delbtn{cursor:pointer;border:none;background:none;color:#ccc;font-size:14px;opacity:0;padding:2px;flex-shrink:0}
 .task-row:hover .delbtn{opacity:1}
+.movebtn{cursor:pointer;border:none;background:none;color:#ccc;font-size:12px;opacity:0;padding:2px;flex-shrink:0}
+.task-row:hover .movebtn{opacity:1;color:#888}
 .addbtn{cursor:pointer;font-size:12px;color:#999;border:1px dashed #ddd;background:none;border-radius:6px;padding:5px 10px;width:100%;margin-top:8px;text-align:left}
 .addbtn:hover{background:#f5f5f0}
 </style>
@@ -155,6 +157,15 @@ function deleteTask(section,id){
   save();render();
 }
 
+function moveTask(fromSection,id){
+  const toSection=fromSection==='focused'?'unfocused':'focused';
+  const t=data[fromSection].find(t=>t.id===id);
+  if(!t)return;
+  data[fromSection]=data[fromSection].filter(t=>t.id!==id);
+  data[toSection].push(t);
+  save();render();
+}
+
 function addTask(section){
   data[section].push({id:nextId++,status:'',priority:'A',name:'新しいタスク',note:'',num:null});
   save();render();
@@ -181,6 +192,7 @@ function renderSection(section){
       ${t.num!=null?`<span class="num-tag">${t.num}</span>`:''}
       <input class="${nc}" value="${nameVal}" onchange="updateName('${section}',${t.id},this.value)" onblur="updateName('${section}',${t.id},this.value)" />
       <input class="tnote" value="${(t.note||'').replace(/"/g,'&quot;')}" placeholder="日付" onchange="updateNote('${section}',${t.id},this.value)" onblur="updateNote('${section}',${t.id},this.value)" />
+      <button class="movebtn" onclick="moveTask('${section}',${t.id})" title="${section==='focused'?'非集中に移動':'集中に移動'}">${section==='focused'?'→':'←'}</button>
       <button class="delbtn" onclick="deleteTask('${section}',${t.id})">✕</button>
     `;
     el.appendChild(row);
@@ -211,21 +223,4 @@ function newWeek(){
 
 function exportTxt(){
   const lines=[`週次タスク — ${data.week}`,'='.repeat(30),'','【集中業務】'];
-  data.focused.forEach(t=>lines.push(`${STATUS_LABEL[t.status]} ${t.priority||'　'} ${t.name}${t.note?' ('+t.note+')':''}`));
-  lines.push('','【非集中業務】');
-  data.unfocused.forEach(t=>lines.push(`${STATUS_LABEL[t.status]} ${t.priority||'　'} ${t.name}${t.note?' ('+t.note+')':''}`));
-  const blob=new Blob([lines.join('\n')],{type:'text/plain;charset=utf-8'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`tasks_${data.week}.txt`;a.click();
-}
-
-function render(){
-  document.getElementById('week-label').textContent='週次タスク — '+data.week;
-  renderStats();
-  renderSection('focused');
-  renderSection('unfocused');
-}
-
-render();
-</script>
-</body>
-</html>
+  data.focused.forEach(t=>lines.push(`${STATUS_LABEL[t.status]} ${t.priority||'　'} ${t.name
