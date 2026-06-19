@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>週次タスクリスト</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;background:#f5f5f0;min-height:100vh;padding:1rem}
+.app{max-width:900px;margin:0 auto}
+.week-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem}
+.week-label{font-size:16px;font-weight:500;color:#1a1a1a}
+.header-btns{display:flex;gap:6px}
+.hbtn{cursor:pointer;font-size:12px;border:1px solid #ddd;background:#fff;border-radius:6px;padding:5px 10px;color:#666}
+.hbtn:hover{background:#f0f0ec}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:.75rem}
+.stat-card{background:#fff;border-radius:8px;padding:8px 12px;border:1px solid #e8e8e4}
+.stat-label{font-size:10px;color:#888;margin-bottom:2px}
+.stat-value{font-size:20px;font-weight:500;color:#1a1a1a}
+.columns{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:600px){.columns{grid-template-columns:1fr}}
+.section-wrap{background:#fff;border:1px solid #e8e8e4;border-radius:10px;padding:12px 14px}
+.col-title{font-size:11px;font-weight:600;color:#888;letter-spacing:.07em;text-transform:uppercase;padding-bottom:8px;border-bottom:1px solid #f0f0ec;margin-bottom:6px}
+.task-row{display:flex;align-items:center;gap:5px;padding:5px 2px;border-bottom:1px solid #f5f5f0;min-height:30px}
+.task-row:last-of-type{border-bottom:none}
+.sbtn{cursor:pointer;min-width:26px;text-align:center;border:none;background:none;padding:2px 3px;border-radius:4px;font-size:13px;color:#999;flex-shrink:0}
+.sbtn:hover{background:#f0f0ec}
+.s-active{color:#1D9E75;font-weight:600}
+.s-forward{color:#888}
+.s-deleted{color:#e24b4a}
+.s-done{color:#3B6D11;font-size:11px}
+.pbtn{cursor:pointer;font-size:10px;font-weight:600;min-width:20px;text-align:center;border:none;border-radius:3px;padding:2px 5px;flex-shrink:0}
+.p-A{background:#fcebeb;color:#a32d2d}
+.p-B{background:#faeeda;color:#854f0b}
+.p-C{background:#f0f0ec;color:#666}
+.p-{background:none;color:#bbb;border:1px solid #e8e8e4}
+.num-tag{font-size:10px;color:#185fa5;font-weight:600;flex-shrink:0}
+.tname{flex:1;color:#1a1a1a;border:none;background:none;font-size:13px;font-family:inherit;padding:1px 4px;border-radius:3px;width:0;min-width:0;outline:none}
+.tname:focus{background:#f5f5f0;outline:1px solid #ccc}
+.tname.done{text-decoration:line-through;color:#aaa}
+.tname.deleted{text-decoration:line-through;color:#aaa;opacity:.5}
+.tnote{font-size:10px;color:#bbb;flex-shrink:0}
+.delbtn{cursor:pointer;border:none;background:none;color:#ccc;font-size:14px;opacity:0;padding:2px;flex-shrink:0}
+.task-row:hover .delbtn{opacity:1}
+.addbtn{cursor:pointer;font-size:12px;color:#999;border:1px dashed #ddd;background:none;border-radius:6px;padding:5px 10px;width:100%;margin-top:8px;text-align:left}
+.addbtn:hover{background:#f5f5f0}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="week-header">
+    <span class="week-label" id="week-label"></span>
+    <div class="header-btns">
+      <button class="hbtn" onclick="exportTxt()">↓ 出力</button>
+      <button class="hbtn" onclick="newWeek()">↺ 新しい週</button>
+    </div>
+  </div>
+  <div class="stats" id="stats"></div>
+  <div class="columns">
+    <div class="section-wrap">
+      <div class="col-title">集中業務</div>
+      <div id="focused-list"></div>
+      <button class="addbtn" onclick="addTask('focused')">＋ タスク追加</button>
+    </div>
+    <div class="section-wrap">
+      <div class="col-title">非集中業務</div>
+      <div id="unfocused-list"></div>
+      <button class="addbtn" onclick="addTask('unfocused')">＋ タスク追加</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const PRIS=['A','B','C',''];
+const STATUSES=['','active','done','forward','deleted'];
+const STATUS_LABEL={'':'　','active':'●','done':'✓','forward':'→','deleted':'×'};
+const STATUS_CLASS={'':'','active':'s-active','done':'s-done','forward':'s-forward','deleted':'s-deleted'};
+
+const DEFAULT={
+  week:'2026年6月19日',
+  focused:[
+    {id:1,status:'active',priority:'A',name:'Busan Food Project 提案',note:'',num:null},
+    {id:2,status:'',priority:'A',name:'日本ARC Project',note:'',num:null},
+    {id:3,status:'',priority:'A',name:'沖縄訴訟面契約書',note:'',num:null},
+    {id:4,status:'',priority:'A',name:'Chromebook 評価見積り',note:'',num:null},
+    {id:5,status:'',priority:'A',name:'PEF Summary from Legal',note:'',num:null},
+    {id:6,status:'',priority:'A',name:'FSY日本スケジュール調整',note:'',num:null},
+    {id:7,status:'',priority:'A',name:'SOS Project',note:'',num:null},
+    {id:8,status:'',priority:'A',name:'日本・人道支援系リスト',note:'',num:null},
+    {id:9,status:'',priority:'A',name:'日本・人道支援ビジョン',note:'',num:null},
+    {id:10,status:'done',priority:'A',name:'放牧フートンプロジェクト',note:'6/16',num:null},
+    {id:11,status:'',priority:'B',name:'TELL ceremony',note:'',num:null},
+    {id:12,status:'',priority:'B',name:'神奈川S.支払い',note:'',num:null},
+    {id:13,status:'',priority:'C',name:'Chouk-UNICEF',note:'',num:null},
+    {id:40,status:'active',priority:'A',name:'GEM visit input',note:'',num:1},
+    {id:41,status:'active',priority:'A',name:'SLC Open house',note:'',num:2},
+    {id:42,status:'',priority:'A',name:'山形フードプロジェクト',note:'',num:null},
+    {id:43,status:'',priority:'B',name:'アンケート報告',note:'',num:null},
+    {id:44,status:'',priority:'B',name:'Teri 払い戻し',note:'',num:null},
+    {id:45,status:'',priority:'C',name:'Compliance Training',note:'',num:null}
+  ],
+  unfocused:[
+    {id:20,status:'',priority:'A',name:'満彦支払い',note:'6/17',num:null},
+    {id:21,status:'done',priority:'',name:'CARDS',note:'6/16',num:null},
+    {id:22,status:'',priority:'',name:'Pohnpei DOE Computer',note:'',num:null},
+    {id:23,status:'',priority:'',name:'FSM Mental health Project',note:'',num:null},
+    {id:24,status:'',priority:'',name:'沖縄コードプロジェクト',note:'',num:null},
+    {id:25,status:'',priority:'',name:'宮崎フードプロジェクト',note:'',num:null},
+    {id:26,status:'',priority:'',name:'Eric South Korea Evaluation',note:'',num:null},
+    {id:27,status:'',priority:'',name:'FSM出張',note:'',num:null},
+    {id:28,status:'',priority:'',name:'ARC Saipan Payment',note:'',num:null},
+    {id:29,status:'',priority:'',name:'2027 日本 Plan',note:'',num:null},
+    {id:30,status:'',priority:'',name:'2027 Plan Guam',note:'',num:null},
+    {id:31,status:'',priority:'',name:'2027 Plan St. Alban支払い',note:'',num:null},
+    {id:32,status:'',priority:'',name:'ARC沖縄会議書',note:'',num:null},
+    {id:50,status:'',priority:'',name:'Hyun Mongolia Trip 予算',note:'',num:null},
+    {id:51,status:'',priority:'',name:'TELL 支払い',note:'',num:null}
+  ]
+};
+
+let data=JSON.parse(localStorage.getItem('wt_tasks_v1'))||JSON.parse(JSON.stringify(DEFAULT));
+let nextId=Math.max(...['focused','unfocused'].flatMap(s=>data[s].map(t=>t.id)),60)+1;
+
+function save(){localStorage.setItem('wt_tasks_v1',JSON.stringify(data));}
+
+function cycleStatus(section,id){
+  const t=data[section].find(t=>t.id===id);
+  const i=STATUSES.indexOf(t.status);
+  t.status=STATUSES[(i+1)%STATUSES.length];
+  if(t.status==='done'){const n=new Date();t.note=`${n.getMonth()+1}/${n.getDate()}`;}
+  save();render();
+}
+
+function cyclePri(section,id){
+  const t=data[section].find(t=>t.id===id);
+  const i=PRIS.indexOf(t.priority);
+  t.priority=PRIS[(i+1)%PRIS.length];
+  save();render();
+}
+
+function updateName(section,id,val){
+  const t=data[section].find(t=>t.id===id);
+  if(t)t.name=val;save();
+}
+
+function deleteTask(section,id){
+  data[section]=data[section].filter(t=>t.id!==id);
+  save();render();
+}
+
+function addTask(section){
+  data[section].push({id:nextId++,status:'',priority:'A',name:'新しいタスク',note:'',num:null});
+  save();render();
+  setTimeout(()=>{
+    const inputs=document.querySelectorAll(`#${section}-list .tname`);
+    if(inputs.length)inputs[inputs.length-1].focus();
+  },50);
+}
+
+function renderSection(section){
+  const el=document.getElementById(section+'-list');
+  if(!el)return;
+  el.innerHTML='';
+  data[section].forEach(t=>{
+    const row=document.createElement('div');
+    row.className='task-row';
+    const sc=STATUS_CLASS[t.status]||'';
+    const sl=STATUS_LABEL[t.status]||'　';
+    const nc='tname'+(t.status==='done'?' done':t.status==='deleted'?' deleted':'');
+    const nameVal=t.name.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+    row.innerHTML=`
+      <button class="sbtn ${sc}" onclick="cycleStatus('${section}',${t.id})" title="状態変更">${sl}</button>
+      <button class="pbtn p-${t.priority}" onclick="cyclePri('${section}',${t.id})">${t.priority||'—'}</button>
+      ${t.num!=null?`<span class="num-tag">${t.num}</span>`:''}
+      <input class="${nc}" value="${nameVal}" onchange="updateName('${section}',${t.id},this.value)" onblur="updateName('${section}',${t.id},this.value)" />
+      ${t.note?`<span class="tnote">${t.note}</span>`:''}
+      <button class="delbtn" onclick="deleteTask('${section}',${t.id})">✕</button>
+    `;
+    el.appendChild(row);
+  });
+}
+
+function renderStats(){
+  const all=[...data.focused,...data.unfocused];
+  const total=all.length;
+  const done=all.filter(t=>t.status==='done').length;
+  const active=all.filter(t=>t.status==='active').length;
+  const priA=all.filter(t=>t.priority==='A'&&t.status!=='done'&&t.status!=='deleted').length;
+  document.getElementById('stats').innerHTML=`
+    <div class="stat-card"><div class="stat-label">合計</div><div class="stat-value">${total}</div></div>
+    <div class="stat-card"><div class="stat-label">完了</div><div class="stat-value">${done}</div></div>
+    <div class="stat-card"><div class="stat-label">進行中</div><div class="stat-value">${active}</div></div>
+    <div class="stat-card"><div class="stat-label">A優先 残り</div><div class="stat-value">${priA}</div></div>
+  `;
+}
+
+function newWeek(){
+  if(!confirm('新しい週を開始します。完了・削除タスクを除いて引き継ぎます。よろしいですか？'))return;
+  const carry=s=>data[s].filter(t=>t.status!=='done'&&t.status!=='deleted').map(t=>({...t,status:t.status==='active'?'active':''}));
+  const n=new Date();
+  data={week:`${n.getFullYear()}年${n.getMonth()+1}月${n.getDate()}日`,focused:carry('focused'),unfocused:carry('unfocused')};
+  save();render();
+}
+
+function exportTxt(){
+  const lines=[`週次タスク — ${data.week}`,'='.repeat(30),'','【集中業務】'];
+  data.focused.forEach(t=>lines.push(`${STATUS_LABEL[t.status]} ${t.priority||'　'} ${t.name}${t.note?' ('+t.note+')':''}`));
+  lines.push('','【非集中業務】');
+  data.unfocused.forEach(t=>lines.push(`${STATUS_LABEL[t.status]} ${t.priority||'　'} ${t.name}${t.note?' ('+t.note+')':''}`));
+  const blob=new Blob([lines.join('\n')],{type:'text/plain;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`tasks_${data.week}.txt`;a.click();
+}
+
+function render(){
+  document.getElementById('week-label').textContent='週次タスク — '+data.week;
+  renderStats();
+  renderSection('focused');
+  renderSection('unfocused');
+}
+
+render();
+</script>
+</body>
+</html>
