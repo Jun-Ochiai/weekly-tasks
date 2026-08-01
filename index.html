@@ -13,7 +13,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .header-btns{display:flex;gap:6px}
 .hbtn{cursor:pointer;font-size:12px;border:1px solid #ddd;background:#fff;border-radius:6px;padding:5px 10px;color:#666}
 .hbtn:hover{background:#f0f0ec}
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:.75rem}
+.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:.75rem}
 .stat-card{background:#fff;border-radius:8px;padding:8px 12px;border:1px solid #e8e8e4}
 .stat-label{font-size:10px;color:#888;margin-bottom:2px}
 .stat-value{font-size:20px;font-weight:500;color:#1a1a1a}
@@ -46,6 +46,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .task-row:hover .delbtn{opacity:1}
 .movebtn{cursor:pointer;border:none;background:none;color:#ccc;font-size:12px;opacity:0;padding:2px;flex-shrink:0}
 .task-row:hover .movebtn{opacity:1;color:#888}
+.typebadge{font-size:10px;font-weight:600;min-width:30px;text-align:center;border-radius:3px;padding:2px 5px;flex-shrink:0}
+.type-new{background:#e6f1fb;color:#185fa5}
+.type-carry{background:#f0f0ec;color:#888}
 .addbtn{cursor:pointer;font-size:12px;color:#999;border:1px dashed #ddd;background:none;border-radius:6px;padding:5px 10px;width:100%;margin-top:8px;text-align:left}
 .addbtn:hover{background:#f5f5f0}
 </style>
@@ -127,11 +130,17 @@ let nextId=Math.max(...['focused','unfocused'].flatMap(s=>data[s].map(t=>t.id)),
 
 function save(){localStorage.setItem('wt_tasks_v1',JSON.stringify(data));}
 
+function nextNum(section){
+  const nums=data[section].map(t=>t.num).filter(n=>n!=null);
+  return nums.length===0?1:Math.max(...nums)+1;
+}
+
 function cycleStatus(section,id){
   const t=data[section].find(t=>t.id===id);
   const i=STATUSES.indexOf(t.status);
   t.status=STATUSES[(i+1)%STATUSES.length];
   if(t.status==='done'){const n=new Date();t.note=`${n.getMonth()+1}/${n.getDate()}`;}
+  if((t.status==='active'||t.status==='done')&&t.num==null){t.num=nextNum(section);}
   save();render();
 }
 
@@ -167,7 +176,7 @@ function moveTask(fromSection,id){
 }
 
 function addTask(section){
-  data[section].push({id:nextId++,status:'',priority:'A',name:'新しいタスク',note:'',num:null});
+  data[section].push({id:nextId++,status:'',priority:'A',name:'新しいタスク',note:'',num:null,type:'new'});
   save();render();
   setTimeout(()=>{
     const inputs=document.querySelectorAll(`#${section}-list .tname`);
@@ -192,6 +201,7 @@ function renderSection(section){
       ${t.num!=null?`<span class="num-tag">${t.num}</span>`:''}
       <input class="${nc}" value="${nameVal}" onchange="updateName('${section}',${t.id},this.value)" onblur="updateName('${section}',${t.id},this.value)" />
       <input class="tnote" value="${(t.note||'').replace(/"/g,'&quot;')}" placeholder="日付" onchange="updateNote('${section}',${t.id},this.value)" onblur="updateNote('${section}',${t.id},this.value)" />
+      <span class="typebadge ${t.type==='new'?'type-new':'type-carry'}">${t.type==='new'?'新規':'継続'}</span>
       <button class="movebtn" onclick="moveTask('${section}',${t.id})" title="${section==='focused'?'非集中に移動':'集中に移動'}">${section==='focused'?'→':'←'}</button>
       <button class="delbtn" onclick="deleteTask('${section}',${t.id})">✕</button>
     `;
@@ -205,17 +215,21 @@ function renderStats(){
   const done=all.filter(t=>t.status==='done').length;
   const active=all.filter(t=>t.status==='active').length;
   const priA=all.filter(t=>t.priority==='A'&&t.status!=='done'&&t.status!=='deleted').length;
+  const newCount=all.filter(t=>t.type==='new').length;
+  const carryCount=all.filter(t=>t.type==='carry').length;
   document.getElementById('stats').innerHTML=`
     <div class="stat-card"><div class="stat-label">合計</div><div class="stat-value">${total}</div></div>
     <div class="stat-card"><div class="stat-label">完了</div><div class="stat-value">${done}</div></div>
     <div class="stat-card"><div class="stat-label">進行中</div><div class="stat-value">${active}</div></div>
     <div class="stat-card"><div class="stat-label">A優先 残り</div><div class="stat-value">${priA}</div></div>
+    <div class="stat-card"><div class="stat-label">新規</div><div class="stat-value" style="color:#185fa5">${newCount}</div></div>
+    <div class="stat-card"><div class="stat-label">継続</div><div class="stat-value" style="color:#888">${carryCount}</div></div>
   `;
 }
 
 function newWeek(){
   if(!confirm('新しい週を開始します。完了・削除タスクを除いて引き継ぎます。よろしいですか？'))return;
-  const carry=s=>data[s].filter(t=>t.status!=='done'&&t.status!=='deleted').map(t=>({...t,note:'',status:t.status==='active'?'active':'forward'}));
+  const carry=s=>data[s].filter(t=>t.status!=='done'&&t.status!=='deleted').map(t=>({...t,note:'',status:'forward',num:null,type:'carry'}));
   const n=new Date();
   data={week:`${n.getFullYear()}年${n.getMonth()+1}月${n.getDate()}日`,focused:carry('focused'),unfocused:carry('unfocused')};
   save();render();
@@ -223,4 +237,21 @@ function newWeek(){
 
 function exportTxt(){
   const lines=[`週次タスク — ${data.week}`,'='.repeat(30),'','【集中業務】'];
-  data.focused.forEach(t=>lines.push(`${STATUS_LABEL[t.status]} ${t.priority||'　'} ${t.name
+  data.focused.forEach(t=>lines.push(`${STATUS_LABEL[t.status]} ${t.priority||'　'} ${t.name}${t.note?' ('+t.note+')':''}`));
+  lines.push('','【非集中業務】');
+  data.unfocused.forEach(t=>lines.push(`${STATUS_LABEL[t.status]} ${t.priority||'　'} ${t.name}${t.note?' ('+t.note+')':''}`));
+  const blob=new Blob([lines.join('\n')],{type:'text/plain;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`tasks_${data.week}.txt`;a.click();
+}
+
+function render(){
+  document.getElementById('week-label').textContent='週次タスク — '+data.week;
+  renderStats();
+  renderSection('focused');
+  renderSection('unfocused');
+}
+
+render();
+</script>
+</body>
+</html>
